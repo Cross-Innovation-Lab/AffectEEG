@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
-from ..affect import FrozenAffectResolver, coordinates, seed_all
+from ..affect import FrozenAffectResolver, SEEDS, TRACKS, coordinates, seed_all
 from ..data import load_cevb, make_pairs
 from .models import ReconstructionModel, BACKBONES
 from .arra import raw_pool, fit_targets, AuxiliarySampler, covariance_correction, POOL_SCHEMA
@@ -306,5 +306,6 @@ def evaluate(args):
         summary.append(row)
     destination = Path(args.output_root)/'reconstruction'/'summary.json'
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(json.dumps({'complete_paper_matrix': len(results) == 140 and not args.smoke, 'runs': results, 'summary': summary}, indent=2)+'\n')
+    expected_fits = len(TRACKS) * len(SEEDS) * len(BACKBONES) * 2
+    destination.write_text(json.dumps({'complete_paper_matrix': len(results) == expected_fits and not args.smoke, 'runs': results, 'summary': summary}, indent=2)+'\n')
     return destination

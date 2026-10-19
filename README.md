@@ -97,7 +97,7 @@ Only keys with acoustic references are included: 202 for SEED-IV and 357 for SEE
 
 The ten backbones are CAT-Net, EEGNet, ATCNet, EEG-Conformer, RGNN, CBraMod, ST-EEGFormer, EEG-Deformer, EEGMamba, and REVE. CLI identifiers are `cat_net`, `eegnet`, `atcnet`, `eeg_conformer`, `rgnn`, `cbramod`, `st_eegformer`, `eeg_deformer`, `eegmamba`, and `reve`.
 
-All tone backbones start from random initialization. Three seeds (`42, 123, 456`) and ten held-out participants define 300 backbone/fold/seed coordinates. Each fold has eight training, one validation, and one test participant (3,840/480/480 trials). Validation offsets from the test participant are `+1/-1/+2`, respectively, modulo ten.
+All ten tone backbones, including CAT-Net, start from random initialization. Three seeds (`42, 123, 456`) and ten held-out participants define 300 backbone/fold/seed coordinates. Each fold has eight training, one validation, and one test participant (3,840/480/480 trials). Validation offsets from the test participant are `+1/-1/+2`, respectively, modulo ten.
 
 EEG uses the pre-cue interval `[-1.5, 0]` seconds for baseline standardization, followed by trial/channel standardization. EMG is rectified, smoothed with a 50-sample envelope, and standardized. Four-second trials are resampled to 500 samples at 125 Hz. Nine EEG-only models receive the fixed 20 electrodes:
 
@@ -139,7 +139,7 @@ The seven reconstruction backbones are NeuroTalk (`neurotalk`), ConvConcatNet (`
 
 For each track and seed, MAET-DE is trained separately on the outer-training affective EEG pool. Its 80/20 inner split groups windows by participant/session/original trial. Five-band DE features have width 310; the MAET EEG embedding has width 32 and a learned projection has width 128. Training uses plain cross-entropy, inverse-class-frequency replacement sampling, Adam `5e-4`, batch 256, 30 epochs, and gradient clipping at one. The selected checkpoint maximizes inner-validation macro-F1, then BA, retaining the earlier tied epoch. DE statistics and participant-balanced class prototypes use only inner-training data. The encoder, classifier, and prototypes remain frozen during reconstruction.
 
-Base and +AffectEEG are trained independently for **50 epochs** on each track with five seeds (`42, 123, 456, 789, 1024`): 140 fits in total. Both use Adam, FP32, batch 32, gradient clipping at one, and the same reconstruction loss and validation selection. Learning rates are `1e-3` for SEED-IV and `3e-4` for SEED-VII. The ARRA adapter rate is 0.3 times the main rate. A plateau scheduler monitors reconstruction training loss (factor 0.5, patience five). Validation PCC selects the checkpoint, with lower validation L1 and then earlier epoch breaking ties; epoch zero is eligible.
+Base and +AffectEEG are trained independently for **50 epochs** on each track with five seeds (`42, 123, 456, 789, 1024`): 140 fits in total (two tracks × seven backbones × two variants × five seeds). Both use Adam, FP32, batch 32, gradient clipping at one, and the same reconstruction loss and validation selection. Learning rates are `1e-3` for SEED-IV and `3e-4` for SEED-VII. The ARRA adapter rate is 0.3 times the main rate. A plateau scheduler monitors reconstruction training loss (factor 0.5, patience five). Validation PCC selects the checkpoint, with lower validation L1 and then earlier epoch breaking ties; epoch zero is eligible.
 
 Full AffectEEG combines bounded ARRA (rank 16, bound 0.1, zero-initialized output) and rank-four FiLM. The content encoder, ARRA, FiLM, and mel decoder receive reconstruction gradients. Covariance and preservation gradients update only ARRA. Covariance uses training-only MD-JPT targets, within-content/tone centering, PCA32 without whitening, and auxiliary batches of four groups with eight distinct sources each. Eight training batches calibrate the covariance coefficient to a gradient-norm ratio of 0.03, clipped to `[1e-4, 300]`; the coefficient ramps over five epochs. Conflicting covariance gradients are projected against the adapter's reconstruction gradient. Feature-preservation weight is 0.01.
 
@@ -153,11 +153,11 @@ python -m affecteeg evaluate --task reconstruction --device cuda:0
 python -m affecteeg train-reconstruction --track seediv --backbone cat_wavenet --seed 42 --variant both --device cuda:0
 ```
 
-Train the corresponding affect models before full reconstruction; Base alone does not require them. `train-affect` also extracts frozen content-teacher features. This trains ten MAET-DE models, not MD-JPT pretraining. MD-JPT's upstream checkpoint and inference configuration are already bundled.
+Train the corresponding affect models before full reconstruction; Base alone does not require them. `train-affect` also extracts frozen content-teacher features. This trains ten MAET-DE models (two tracks × five seeds), not MD-JPT pretraining. MD-JPT's upstream checkpoint and inference configuration are already bundled.
 
 ## Outputs, metrics, and complete runs
 
-All training/evaluation commands accept `--processed-root`, `--output-root`, and `--device`; individual coordinates can be selected with `--seed`, `--backbone`, `--fold` (tone), or `--track` (reconstruction). `--smoke` performs shortened diagnostics in a separate `outputs/smoke/` tree. These diagnostics are not paper training runs.
+Training seeds follow the manuscript by task: CAT-Net and all other tone backbones use `42, 123, 456`; reconstruction and its MAET-DE affect encoders use `42, 123, 456, 789, 1024`. These lists are defined separately in `affecteeg/common.py`. `--seed all` uses the seed list for the selected task, and unsupported seeds are rejected. These commands accept `--processed-root`, `--output-root`, and `--device`; individual coordinates can be selected with `--seed`, `--backbone`, `--fold` (tone), or `--track` (reconstruction). `--smoke` performs shortened diagnostics in a separate `outputs/smoke/` tree. These diagnostics are not paper training runs.
 
 ```text
 outputs/
@@ -195,8 +195,8 @@ See [VALIDATION.md](VALIDATION.md) for the checks performed on this release.
 
 ## Protocol provenance
 
-The package follows the current main manuscript for backbone scope, scratch tone initialization, `42/123/456` tone seeds, 500-sample EEG-only inputs, and 50-epoch Base/full reconstruction. Supplementary settings supply details not expanded in the main text. Four foundation-model optimizer defaults and the corrected reconstruction loss come from the existing project implementation. The historical SEED-IV compression is retained by explicit project decision and described above with its actual duration.
+The package follows the current main manuscript for backbone scope, scratch tone initialization, `42/123/456` tone seeds, 500-sample EEG-only inputs, and 50-epoch Base/full reconstruction. Reconstruction and MAET-DE use the manuscript's five seeds `42/123/456/789/1024`. Supplementary settings supply details not expanded in the main text. Four foundation-model optimizer defaults and the corrected reconstruction loss come from the existing project implementation. The historical SEED-IV compression is retained by explicit project decision and described above with its actual duration.
 
-These choices change parts of the historical training recipe: earlier runs included pretrained tone backbones, CAT-Net seeds `42/43/44`, 499-sample EEG-only caches, and 60-epoch reconstruction Base fits. The new package therefore reproduces the specified methods and protocol; old manuscript table numbers are not acceptance targets for numerical replay. No historical predictions or trained main-experiment models are distributed.
+These choices change parts of the historical training recipe: earlier runs included pretrained tone backbones, different CAT-Net seeds, 499-sample EEG-only caches, and 60-epoch reconstruction Base fits. The new package therefore reproduces the specified methods and protocol; old manuscript table numbers are not acceptance targets for numerical replay. No historical predictions or trained main-experiment models are distributed.
 
 Third-party architecture and checkpoint sources, together with included license files, are listed in [THIRD_PARTY.md](THIRD_PARTY.md).

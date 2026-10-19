@@ -9,8 +9,9 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 from vendor.maet.architecture import MAET, default_maet_kwargs
+from .common import RECONSTRUCTION_SEEDS
 
-SEEDS = (42, 123, 456, 789, 1024)
+SEEDS = RECONSTRUCTION_SEEDS
 TRACKS = ('seediv', 'seedvii')
 BANDS = ((1, 4), (4, 8), (8, 14), (14, 31), (31, 49))
 
@@ -31,7 +32,7 @@ def coordinates(args):
     tracks = TRACKS if args.track == 'all' else (args.track,)
     seeds = SEEDS if str(args.seed) == 'all' else (int(args.seed),)
     if any(t not in TRACKS for t in tracks) or any(s not in SEEDS for s in seeds):
-        raise ValueError('use the paper tracks and five registered seeds')
+        raise ValueError('use tracks seediv/seedvii and training seeds 42/123/456/789/1024')
     return tracks, seeds
 
 

@@ -32,31 +32,36 @@ def test_tone_pairs_seeds_within_participants_and_refuses_incomplete_inference(t
     assert 'delta_ba_ci95' not in incomplete['models'][0]
 
 
-def test_complete_reconstruction_family_known_paired_effect(tmp_path, monkeypatch):
+def test_five_seed_reconstruction_matrix_and_incomplete_inference(tmp_path, monkeypatch):
     from affecteeg import statistics as s
     def read_metrics(path):
         relative = path.relative_to(tmp_path / 'reconstruction')
         track, model, variant, seed = relative.parts[:4]
         n, classes = (37, 4) if track == 'seediv' else (71, 7)
-        delta = .02 if variant == 'affecteeg' else 0
+        delta = {42: .01, 123: .02, 456: .03, 789: .04, 1024: .05}[int(seed.removeprefix('seed_'))] if variant == 'affecteeg' else 0
         keys = {f'v{i}|0|{i % classes}': np.array([.5+delta, 1.-delta, .2-delta]) for i in range(n)}
         return keys, {0: ('shared-key', 1, 2)}
     monkeypatch.setattr(s, '_read_key_metrics', read_metrics)
     for track in ('seediv', 'seedvii'):
         for model in s.GENERATION_MODELS:
             for variant in ('base', 'affecteeg'):
-                for seed in s.GENERATION_SEEDS:
+                for seed in (42, 123, 456, 789, 1024):
                     path = tmp_path/'reconstruction'/track/model/variant/f'seed_{seed}'/'test_metrics.csv'
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.touch()
     result = s.summarize_reconstruction(tmp_path)
     assert result['status'] == 'complete'
+    assert result['completed_fits'] == result['expected_fits'] == 140
+    assert result['missing'] == []
     assert len(result['paired_pcc']) == 16
     for row in result['paired_pcc']:
-        np.testing.assert_allclose(row['delta_pcc'], .02)
-        np.testing.assert_allclose(row['ci95'], [.02, .02])
+        np.testing.assert_allclose(row['delta_pcc'], .03)
+        np.testing.assert_allclose(row['ci95'], [.03, .03])
         assert row['significant_positive']
     path.unlink()
     incomplete = s.summarize_reconstruction(tmp_path)
     assert incomplete['status'] == 'partial'
+    assert incomplete['completed_fits'] == 139
+    assert incomplete['expected_fits'] == 140
+    assert incomplete['missing'] == ['seedvii/cat_wavenet/affecteeg/1024']
     assert incomplete['paired_pcc'] == []

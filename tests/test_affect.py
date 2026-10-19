@@ -1,6 +1,49 @@
 import numpy as np
+import pytest
 import torch
 from affecteeg.affect import extract_de, inner_split, fit_de_stats, MAETProjector, subject_balanced_prototypes
+
+
+def test_training_coordinates_follow_task_specific_manuscript_seeds():
+    from affecteeg.__main__ import parser
+    from affecteeg.affect import coordinates
+    from affecteeg.reconstruction.runner import selections
+    from affecteeg.tone.training import _coordinates
+
+    tone = _coordinates(parser().parse_args(['train-tone']))
+    assert len(tone) == 300
+    assert {seed for _, seed, _ in tone} == {42, 123, 456}
+    cat = _coordinates(parser().parse_args(['train-tone', '--backbone', 'cat_net']))
+    assert len(cat) == 30
+    assert {seed for _, seed, _ in cat} == {42, 123, 456}
+    tracks, seeds = coordinates(parser().parse_args(['train-affect']))
+    assert set(seeds) == {42, 123, 456, 789, 1024}
+    assert len(tracks) * len(seeds) == 10
+    tracks, seeds, backbones, variants = selections(parser().parse_args(['train-reconstruction']))
+    assert set(seeds) == {42, 123, 456, 789, 1024}
+    assert len(tracks) * len(seeds) * len(backbones) * len(variants) == 140
+
+
+def test_cli_rejects_wrong_task_seeds_before_data_loading():
+    from affecteeg.__main__ import main, parser
+    from affecteeg.affect import coordinates
+    from affecteeg.reconstruction.runner import selections
+
+    for seed in ('43', '44', '789', '1024'):
+        with pytest.raises(SystemExit) as error:
+            main(['train-tone', '--backbone', 'cat_net', '--seed', seed])
+        assert error.value.code == 2
+    for command in ('train-affect', 'evaluate'):
+        with pytest.raises(SystemExit) as error:
+            main([command, '--task', 'tone', '--seed', '789'])
+        assert error.value.code == 2
+    for seed in ('789', '1024'):
+        args = parser().parse_args(['train-affect', '--task', 'reconstruction', '--seed', seed])
+        assert coordinates(args)[1] == (int(seed),)
+        args = parser().parse_args(['train-reconstruction', '--seed', seed])
+        assert selections(args)[1] == (int(seed),)
+        args = parser().parse_args(['evaluate', '--task', 'reconstruction', '--seed', seed])
+        assert selections(args)[1] == (int(seed),)
 
 
 def test_de_matches_explicit_1024_fft_band_reference():

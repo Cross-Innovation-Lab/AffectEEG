@@ -6,7 +6,7 @@ Validated on 2026-10-19. Full main-experiment training was not launched.
 
 The release file set was copied to a new temporary directory outside the source repository. The original repository was removed from the Python import path, user site-packages were disabled, and all tests ran against the copied package and its bundled assets.
 
-**64 tests passed in 37.42 seconds**, including the EEGMamba CUDA test. All five CLI subcommands (`prepare`, `train-affect`, `train-tone`, `train-reconstruction`, `evaluate`) successfully displayed their help from the copied directory.
+The initial release passed **64 tests in 37.42 seconds**, including the EEGMamba CUDA test. All five CLI subcommands (`prepare`, `train-affect`, `train-tone`, `train-reconstruction`, `evaluate`) successfully displayed their help from the copied directory.
 
 The test coverage includes:
 
@@ -20,6 +20,18 @@ The test coverage includes:
 - Participant bootstrap aggregation, emotion-stratified key bootstrap, the complete 16-comparison Holm family, and partial-matrix handling.
 
 PyTorch emitted informational convolution/Transformer warnings and a Mamba autocast deprecation warning; no test failed or was skipped in this CUDA run.
+
+## Manuscript seed alignment
+
+CAT-Net and the other nine tone backbones use `42, 123, 456`, matching the main manuscript's tone table and supplementary participant-split protocol. Reconstruction and MAET-DE use `42, 123, 456, 789, 1024`, matching the manuscript's reconstruction protocol. The two task-specific seed lists are defined in `affecteeg/common.py`. The experiment matrix contains 300 tone backbone/seed/fold coordinates, ten MAET-DE models, and 140 reconstruction fits.
+
+After this alignment, **22 focused tests passed in 4.67 seconds**. They verify CAT-Net's 30 participant/seed coordinates, all task-specific experiment counts, five-seed effect averaging, a complete 140-fit reconstruction family, and withheld inference when one of those fits is missing. CLI checks reject `43/44/789/1024` for CAT-Net, reject reconstruction-only seeds for tone evaluation and teacher preparation before loading data, and accept `789/1024` for reconstruction training, evaluation, and MAET-DE training. Data-protocol and tone-participant-split checks also passed.
+
+The focused checks can be repeated with:
+
+```bash
+python -m pytest -q tests/test_statistics.py tests/test_affect.py tests/test_data.py tests/test_tone.py::test_seed_specific_participant_splits
+```
 
 ## End-to-end diagnostic runs
 

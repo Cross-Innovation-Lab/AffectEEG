@@ -4,20 +4,21 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .common import PACKAGE_ROOT
+from .common import PACKAGE_ROOT, RECONSTRUCTION_SEEDS, TONE_SEEDS
 
 
 def parser():
     root = argparse.ArgumentParser(description="AffectEEG main experiments: prepare, train and evaluate.")
     sub = root.add_subparsers(dest="command", required=True)
 
-    def paths(p, runtime=True):
+    def paths(p, runtime=True, seeds=RECONSTRUCTION_SEEDS):
         p.add_argument("--processed-root", type=Path, default=PACKAGE_ROOT / "data" / "processed")
         p.add_argument("--output-root", type=Path, default=PACKAGE_ROOT / "outputs")
         if runtime:
             p.add_argument("--device", default="auto", help="cpu, cuda, cuda:N, or auto")
             p.add_argument("--threads", type=int, default=4, help="PyTorch CPU threads")
-            p.add_argument("--seed", default="all", help="One paper seed or all")
+            p.add_argument("--seed", choices=("all", *(str(seed) for seed in seeds)),
+                           default="all", help="One manuscript training seed or all seeds for the selected task")
 
     prepare = sub.add_parser("prepare", help="Build prepared data from downloaded source files")
     paths(prepare, runtime=False)
@@ -34,7 +35,7 @@ def parser():
     for name, description in (("train-tone", "Train native and adapted tone classifiers"),
                                ("train-reconstruction", "Train independent Base and full AffectEEG reconstructors")):
         p = sub.add_parser(name, help=description)
-        paths(p)
+        paths(p, seeds=TONE_SEEDS if name == "train-tone" else RECONSTRUCTION_SEEDS)
         p.add_argument("--backbone", default="all")
         p.add_argument("--variant", choices=("both", "base", "affecteeg"), default="both")
         p.add_argument("--smoke", action="store_true", help="Short diagnostic fit; outputs are not paper results")
@@ -55,10 +56,15 @@ def parser():
 
 
 def main(argv=None):
-    args = parser().parse_args(argv)
+    cli = parser()
+    args = cli.parse_args(argv)
     if args.command == "prepare":
         from .preparation import prepare
         return prepare(args.raw_root, args.processed_root, task=args.task, track=args.track)
+    tone_task = args.command == "train-tone" or getattr(args, "task", None) == "tone"
+    seeds = TONE_SEEDS if tone_task else RECONSTRUCTION_SEEDS
+    if args.seed != "all" and int(args.seed) not in seeds:
+        cli.error(f"--seed for the selected task must be one of {seeds}, or all")
     import torch
     from .common import resolve_device
     if args.threads <= 0:

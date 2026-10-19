@@ -4,10 +4,11 @@ from collections import defaultdict
 import csv
 from pathlib import Path
 import numpy as np
-from .common import write_json
+from .common import RECONSTRUCTION_SEEDS, TONE_SEEDS, write_json
 
-TONE_SEEDS = (42, 123, 456)
-GENERATION_SEEDS = (42, 123, 456, 789, 1024)
+GENERATION_SEEDS = RECONSTRUCTION_SEEDS
+GENERATION_TRACKS = ('seediv', 'seedvii')
+GENERATION_VARIANTS = ('base', 'affecteeg')
 GENERATION_MODELS = ('neurotalk', 'convconcatnet', 'fesde', 'ssm2mel', 'dmf2mel', 'neurosonic', 'cat_wavenet')
 
 
@@ -105,12 +106,14 @@ def _read_key_metrics(path):
 
 
 def summarize_reconstruction(output_root):
-    """Infer the 16-comparison family only after all 140 evaluation fits exist."""
+    """Infer the 16-comparison family only after the complete fit matrix exists."""
     root = Path(output_root)/'reconstruction'
     values, support, missing = {}, {}, []
-    for track in ('seediv', 'seedvii'):
+    expected_fits = (len(GENERATION_TRACKS) * len(GENERATION_MODELS)
+                     * len(GENERATION_VARIANTS) * len(GENERATION_SEEDS))
+    for track in GENERATION_TRACKS:
         for model in GENERATION_MODELS:
-            for variant in ('base', 'affecteeg'):
+            for variant in GENERATION_VARIANTS:
                 for seed in GENERATION_SEEDS:
                     coordinate = (track, model, variant, seed)
                     path = root/track/model/variant/f'seed_{seed}'/'test_metrics.csv'
@@ -125,20 +128,20 @@ def summarize_reconstruction(output_root):
                     support[track] = identity
                     values[coordinate] = keys
     result = {'status': 'partial' if missing else 'complete', 'completed_fits': len(values),
-              'expected_fits': 140, 'missing': missing, 'models': [], 'paired_pcc': []}
+              'expected_fits': expected_fits, 'missing': missing, 'models': [], 'paired_pcc': []}
     if missing:
         write_json(root/'paper_summary.json', result)
         return result
     inference = []
-    for ti, track in enumerate(('seediv', 'seedvii')):
+    for ti, track in enumerate(GENERATION_TRACKS):
         keys = sorted(values[(track, GENERATION_MODELS[0], 'base', GENERATION_SEEDS[0])])
         emotions = np.array([int(key.rsplit('|', 1)[-1]) for key in keys])
         classes = sorted(set(emotions))
         tensor = np.array([[[np.mean([values[(track, m, v, s)][key] for s in GENERATION_SEEDS], axis=0)
-                             for key in keys] for m in GENERATION_MODELS] for v in ('base', 'affecteeg')])
+                             for key in keys] for m in GENERATION_MODELS] for v in GENERATION_VARIANTS])
         point = np.mean([tensor[:, :, emotions == e, :].mean(2) for e in classes], axis=0)
         point = np.concatenate([point, point.mean(1, keepdims=True)], axis=1)
-        for vi, variant in enumerate(('base', 'affecteeg')):
+        for vi, variant in enumerate(GENERATION_VARIANTS):
             for mi, model in enumerate((*GENERATION_MODELS, 'backbone_mean')):
                 result['models'].append({'track': track, 'backbone': model, 'variant': variant,
                     **dict(zip(('pcc', 'l1', 'rfe'), point[vi, mi].tolist()))})
@@ -153,7 +156,7 @@ def summarize_reconstruction(output_root):
                               'ci95': intervals[:, mi].tolist(), 'p_raw': float(p_values[mi])})
     for row, adjusted in zip(inference, holm_adjust([r['p_raw'] for r in inference])):
         row.update(p_holm=float(adjusted), significant_positive=bool(adjusted < .05 and row['ci95'][0] > 0))
-    result.update(paired_pcc=inference, aggregation='equal items per key, five seeds, equal keys within emotion, equal emotions; equal models for mean',
+    result.update(paired_pcc=inference, aggregation=f'equal items per key, {len(GENERATION_SEEDS)} seeds, equal keys within emotion, equal emotions; equal models for mean',
                   bootstrap={'draws': 10_000, 'unit': 'condition key', 'strata': 'emotion',
                              'seeds': {'seediv': 20261010, 'seedvii': 20261011}, 'holm_family_size': 16})
     write_json(root/'paper_summary.json', result)

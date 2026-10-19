@@ -3,10 +3,11 @@ from pathlib import Path
 import copy
 import json
 import numpy as np
+from ..common import TONE_SEEDS
 
 BACKBONES = ('cat_net', 'eegnet', 'atcnet', 'eeg_conformer', 'rgnn',
              'cbramod', 'st_eegformer', 'eeg_deformer', 'eegmamba', 'reve')
-SEEDS = (42, 123, 456)
+SEEDS = TONE_SEEDS
 OFFSETS = {42: 1, 123: -1, 456: 2}
 SUBJECTS = tuple(range(1, 11))
 CAT_CHANNELS = ('T7', 'T8', 'Fp1', 'Fpz', 'Fp2')

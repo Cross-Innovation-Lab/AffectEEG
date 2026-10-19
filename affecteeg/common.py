@@ -8,6 +8,8 @@ from pathlib import Path
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+TONE_SEEDS = (42, 123, 456)
+RECONSTRUCTION_SEEDS = (42, 123, 456, 789, 1024)
 
 
 def read_json(path):
