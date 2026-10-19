@@ -2,8 +2,7 @@
 
 This package contains the main tone-decoding and canonical-mel reconstruction experiments for AffectEEG. It provides raw-data preparation, CEVB construction, scratch backbone training, AffectEEG adaptation, affect-encoder training, and evaluation. All runtime paths are relative to this package or supplied on the command line.
 
-The release includes code, fixed protocol indices, and the frozen MD-JPT checkpoint. Acquire the four source datasets separately. Generated data, features, checkpoints, predictions, and logs are written to your local `data/processed/` and `outputs/` directories and are excluded by the release packager.
-
+The release includes code, fixed protocol indices, and the frozen MD-JPT checkpoint. Acquire the four source datasets separately. Generated data, features, checkpoints, predictions, and logs are written to your local `data/processed/` and `outputs/` directories and are excluded by the release package
 ## Installation
 
 Use Python 3.10 or 3.11. Install a PyTorch 2.6 build appropriate for your machine before the remaining requirements. The verification environment used Python 3.10, PyTorch 2.6.0 with CUDA 12.4, and an NVIDIA GPU. CPU execution is supported by the other backbones; EEGMamba requires CUDA and its extensions.
@@ -196,7 +195,5 @@ See [VALIDATION.md](VALIDATION.md) for the checks performed on this release.
 ## Protocol provenance
 
 The package follows the current main manuscript for backbone scope, scratch tone initialization, `42/123/456` tone seeds, 500-sample EEG-only inputs, and 50-epoch Base/full reconstruction. Reconstruction and MAET-DE use the manuscript's five seeds `42/123/456/789/1024`. Supplementary settings supply details not expanded in the main text. Four foundation-model optimizer defaults and the corrected reconstruction loss come from the existing project implementation. The historical SEED-IV compression is retained by explicit project decision and described above with its actual duration.
-
-These choices change parts of the historical training recipe: earlier runs included pretrained tone backbones, different CAT-Net seeds, 499-sample EEG-only caches, and 60-epoch reconstruction Base fits. The new package therefore reproduces the specified methods and protocol; old manuscript table numbers are not acceptance targets for numerical replay. No historical predictions or trained main-experiment models are distributed.
 
 Third-party architecture and checkpoint sources, together with included license files, are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
