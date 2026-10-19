@@ -1,0 +1,3 @@
+# Install after requirements.txt; wheels must match Python, PyTorch and CUDA.
+mamba-ssm==2.3.0
+causal-conv1d==1.6.0

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "c0_fixed_anchor",
+    "adapter_lr": 0.0001,
+    "head_lr": 0.0001,
+    "rank": 16,
+    "rho": 0.1,
+    "kd_weight": 0.5,
+    "covariance_weight": 10.0,
+    "teacher_view": "original",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c1_separate_lr_and_calibration",
+    "adapter_lr": 0.0003,
+    "head_lr": 0.0001,
+    "rank": 16,
+    "rho": 0.1,
+    "kd_weight": 0.5,
+    "covariance_weight": "calibrated",
+    "teacher_view": "original",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c2_lower_head_lr_and_kd",
+    "adapter_lr": 0.001,
+    "head_lr": 3e-05,
+    "rank": 16,
+    "rho": 0.1,
+    "kd_weight": 0.1,
+    "covariance_weight": "calibrated",
+    "teacher_view": "original",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c3_frozen_head",
+    "adapter_lr": 0.0003,
+    "head_lr": 0.0,
+    "rank": 16,
+    "rho": 0.1,
+    "kd_weight": 0.0,
+    "covariance_weight": "calibrated",
+    "teacher_view": "original",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c4_conservative_capacity",
+    "adapter_lr": 0.0003,
+    "head_lr": 3e-05,
+    "rank": "conservative_rank",
+    "rho": 0.05,
+    "kd_weight": 0.1,
+    "covariance_weight": "calibrated",
+    "teacher_view": "original",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c5_expanded_capacity",
+    "adapter_lr": 0.0003,
+    "head_lr": 3e-05,
+    "rank": "expanded_rank",
+    "rho": 0.2,
+    "kd_weight": 0.1,
+    "covariance_weight": "calibrated",
+    "teacher_view": "original",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c6_teacher_pca32",
+    "adapter_lr": 0.001,
+    "head_lr": 3e-05,
+    "rank": 16,
+    "rho": 0.1,
+    "kd_weight": 0.1,
+    "covariance_weight": "calibrated",
+    "teacher_view": "train_only_pca32_no_whitening",
+    "covariance": "global_centered",
+    "covariance_batch_size": 128
+  },
+  {
+    "id": "c7_conditional_covariance",
+    "adapter_lr": 0.001,
+    "head_lr": 3e-05,
+    "rank": 16,
+    "rho": 0.1,
+    "kd_weight": 0.1,
+    "covariance_weight": "calibrated",
+    "teacher_view": "train_only_pca32_no_whitening",
+    "covariance": "within_tone_centered_equal_tone_weight",
+    "covariance_batch_size": 512
+  }
+]

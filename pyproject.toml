@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "affecteeg-main-experiments"
+version = "1.0.0"
+description = "Standalone main experiments for AffectEEG"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[project.scripts]
+affecteeg = "affecteeg.__main__:main"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["affecteeg*", "vendor*"]
+
+[tool.setuptools.package-data]
+"affecteeg.tone" = ["*.json"]
+"vendor.tone" = ["LICENSE*.txt"]
+"vendor.tone.reve" = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["cuda: requires a CUDA device and the optional Mamba extensions"]
