@@ -2,7 +2,7 @@
 
 This package contains the main tone-decoding and canonical-mel reconstruction experiments for AffectEEG. It provides raw-data preparation, CEVB construction, scratch backbone training, AffectEEG adaptation, affect-encoder training, and evaluation. All runtime paths are relative to this package or supplied on the command line.
 
-The release includes code, fixed protocol indices, and the frozen MD-JPT checkpoint. Acquire the four source datasets separately. Generated data, features, checkpoints, predictions, and logs are written to your local `data/processed/` and `outputs/` directories and are excluded by the release package
+The release includes code, fixed protocol indices, and the frozen MD-JPT checkpoint. Acquire the four source datasets separately. Generated data, features, checkpoints, predictions, and logs are written to your local `data/processed/`.
 ## Installation
 
 Use Python 3.10 or 3.11. Install a PyTorch 2.6 build appropriate for your machine before the remaining requirements. The verification environment used Python 3.10, PyTorch 2.6.0 with CUDA 12.4, and an NVIDIA GPU. CPU execution is supported by the other backbones; EEGMamba requires CUDA and its extensions.
