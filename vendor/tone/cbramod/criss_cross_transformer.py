@@ -59,7 +59,7 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
 
-        # Legacy string support for activation function.
+        # Resolve activation functions specified by name.
         if isinstance(activation, str):
             activation = _get_activation_fn(activation)
 

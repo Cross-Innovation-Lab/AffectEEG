@@ -30,7 +30,7 @@ def parser():
     paths(affect)
     affect.add_argument("--task", choices=("all", "tone", "reconstruction"), default="all")
     affect.add_argument("--track", choices=("all", "seediv", "seedvii"), default="all")
-    affect.add_argument("--smoke", action="store_true", help="Short diagnostic fit; outputs are not paper results")
+    affect.add_argument("--smoke", action="store_true", help="Short diagnostic fit saved under the smoke output directory")
 
     for name, description in (("train-tone", "Train native and adapted tone classifiers"),
                                ("train-reconstruction", "Train independent Base and full AffectEEG reconstructors")):
@@ -38,7 +38,7 @@ def parser():
         paths(p, seeds=TONE_SEEDS if name == "train-tone" else RECONSTRUCTION_SEEDS)
         p.add_argument("--backbone", default="all")
         p.add_argument("--variant", choices=("both", "base", "affecteeg"), default="both")
-        p.add_argument("--smoke", action="store_true", help="Short diagnostic fit; outputs are not paper results")
+        p.add_argument("--smoke", action="store_true", help="Short diagnostic fit saved under the smoke output directory")
         if name == "train-tone":
             p.add_argument("--fold", default="all", help="Held-out participant 1..10 or all")
         else:
@@ -72,7 +72,7 @@ def main(argv=None):
     torch.set_num_threads(args.threads)
     args.device = resolve_device(args.device)
     if args.smoke:
-        # Diagnostic checkpoints can never overwrite the full protocol output.
+        # Store diagnostic checkpoints in a dedicated output directory.
         args.output_root = args.output_root / "smoke"
     if args.command == "train-affect":
         from .teacher import extract_tone_features, extract_content_features

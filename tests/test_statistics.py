@@ -7,7 +7,7 @@ def test_holm_preserves_comparison_order_and_monotonicity():
 
 
 def test_stratification_weights_emotions_equally_and_shares_draws():
-    # Three keys in one emotion and one in the other: the mean is 0.5, not 0.25.
+    # Equal weighting of emotions gives a mean of 0.5 for these four keys.
     values = np.array([[0, 0, 0, 1], [0, 0, 0, 2]])
     boot = stratified_bootstrap(values, [0, 0, 0, 1], draws=200)
     np.testing.assert_allclose(boot[:, 0], .5)

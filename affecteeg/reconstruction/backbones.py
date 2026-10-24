@@ -1,7 +1,7 @@
-"""Seven paper-used task-adapted architectures, extracted from part2_class_style.
+"""Seven task-adapted reconstruction architectures.
 
-These are the project's clean-room task adaptations of architectural ideas;
-they are not upstream implementations or faithful literature reproductions.
+These are the project's clean-room implementations of architectural ideas,
+adapted to the common EEG-to-mel interface.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -18,7 +18,7 @@ class ClassStyleOutput:
     diagnostics: dict[str, torch.Tensor] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, object]:
-        """Return a legacy-friendly dictionary without detaching tensors."""
+        """Return a dictionary that preserves tensor autograd graphs."""
         return {
             "mel": self.mel,
             "aux_losses": self.aux_losses,
@@ -83,7 +83,7 @@ class _ResidualDilatedBlock(nn.Module):
         return x + self.out(torch.tanh(value) * torch.sigmoid(gate)).transpose(1, 2)
 
 class _StateMixBlock(nn.Module):
-    """A disclosed state-space-inspired gated convolution, not an S4/Mamba port."""
+    """State-space-inspired gated convolution."""
 
     def __init__(self, dim: int, dilation: int = 1, dropout: float = 0.1) -> None:
         super().__init__()
@@ -132,7 +132,7 @@ class _QueryMelDecoder(nn.Module):
 
     def forward(self, memory: torch.Tensor) -> torch.Tensor:
         query = self.frame_query.expand(memory.size(0), -1, -1)
-        frames = self.decoder(query, memory)  # (B,188,D)
+        frames = self.decoder(query, memory)  # (B,187,D)
         return self.mel_projection(frames).transpose(1, 2).contiguous()
 
 class NeuroTalkContentCore(nn.Module):
@@ -181,7 +181,7 @@ class _DenseConvLayer(nn.Module):
         return torch.cat([x, update], dim=-1)
 
 class ConvConcatContentCore(nn.Module):
-    """Single dense concatenative temporal convolution core (no ensemble)."""
+    """Single dense concatenative temporal convolution core."""
 
     def __init__(self, n_channels: int, model_dim: int, dropout: float) -> None:
         super().__init__()
@@ -223,7 +223,7 @@ class CATWaveNetContentCore(nn.Module):
         return hidden
 
 class CATWaveNetMelDecoder(nn.Module):
-    """Predict coarse mel from EEG memory, then refine it without GT mel."""
+    """Predict coarse mel from EEG memory, then refine it using EEG cross-attention."""
 
     def __init__(self, model_dim: int, n_mels: int, n_frames: int, dropout: float) -> None:
         super().__init__()
@@ -243,7 +243,7 @@ class CATWaveNetMelDecoder(nn.Module):
         )
 
     def forward(self, memory: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        coarse = self.coarse(memory)  # (B,10,188), predicted from EEG only
+        coarse = self.coarse(memory)  # (B,10,187), predicted from EEG memory
         query = self.coarse_embedding(coarse).transpose(1, 2)
         attended, _ = self.cross_attention(query, memory, memory, need_weights=False)
         mel = self.refine(query + attended).transpose(1, 2).contiguous()
@@ -267,7 +267,7 @@ class FESDEContentCore(nn.Module):
         return hidden
 
 class FlowConnectorMelDecoder(nn.Module):
-    """Invertible-coupling-inspired mel-state connector with no speech prior."""
+    """EEG-conditioned, invertible-coupling-inspired mel-state connector."""
 
     def __init__(self, model_dim: int, n_mels: int, n_frames: int, dropout: float) -> None:
         super().__init__()
@@ -292,7 +292,7 @@ class FlowConnectorMelDecoder(nn.Module):
         return self.output(state)
 
 class SSM2MelContentCore(nn.Module):
-    """U-Net plus bidirectional state-mixing approximation without subject ESM."""
+    """U-Net plus bidirectional state-mixing approximation."""
 
     def __init__(self, n_channels: int, model_dim: int, dropout: float) -> None:
         super().__init__()
@@ -386,7 +386,7 @@ class AdaptiveSplineMelDecoder(nn.Module):
         self.temporal_refine = nn.Conv1d(n_mels, n_mels, kernel_size=3, padding=1, groups=n_mels)
 
     def forward(self, memory: torch.Tensor) -> torch.Tensor:
-        knots = self.knot_decoder(memory)  # (B,25,188)
+        knots = self.knot_decoder(memory)  # (B,25,187)
         weights = self.linear_basis + 0.01 * torch.tanh(self.basis_residual)
         mel = torch.einsum("mk,bkf->bmf", weights, knots)
         return mel + self.temporal_refine(mel)

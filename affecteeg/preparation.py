@@ -1,8 +1,6 @@
 """Build tone inputs and CEVB directly from the separately acquired raw corpora.
 
-No network access or historical feature caches are used. SEED-IV deliberately
-retains the paper experiments' historical 4,000 -> 800 sample conversion:
-4,000 samples at the actual 200 Hz source rate span TWENTY seconds.
+SEED-IV and SEED-VII use four-second, 800-sample windows at 200 Hz.
 """
 from __future__ import annotations
 
@@ -85,10 +83,10 @@ def _zscore(x: np.ndarray) -> np.ndarray:
 
 
 def tone_preprocess(eeg: np.ndarray, emg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Raw (trial, time, channel) -> standardized 500-sample inputs, no differences.
+    """Raw (trial, time, channel) -> standardized 500-sample raw-channel inputs.
 
     The 50-sample EMG envelope and [-1.5, 0] EEG baseline operate on 2,000
-    samples, reproducing the original 500 Hz preprocessing intermediate.
+    samples at an intermediate sampling rate of 500 Hz.
     """
     eeg = resample(eeg, 2000, axis=1).astype(np.float32)
     emg = np.abs(resample(emg, 2000, axis=1).astype(np.float32))
@@ -161,7 +159,7 @@ def build_audio_index(root: Path) -> list[dict]:
 
 
 def canonical_log_mel(path: Path, mel_filter=None) -> np.ndarray:
-    """Two-second 24 kHz BigVGAN/Slaney log-mel with one right padding frame."""
+    """Two-second 24 kHz BigVGAN/Slaney log-mel with 100 bins and 187 frames."""
     import librosa
     import torch
     from torch.nn import functional as F
@@ -187,8 +185,8 @@ def canonical_log_mel(path: Path, mel_filter=None) -> np.ndarray:
             n_mels=100, fmin=0, fmax=None, htk=False, norm="slaney")).float()
     mel = torch.log((mel_filter @ magnitude).clamp_min(1e-5))
     if mel.shape[-1] != 187:
-        raise ValueError(f"expected 187 valid mel frames, got {mel.shape}")
-    return F.pad(mel, (0, 1), value=float(np.log(1e-5)))[0].numpy()
+        raise ValueError(f"expected 187 mel frames, got {mel.shape}")
+    return mel[0].numpy()
 
 
 def actor_trimmed_mean(mels: list[np.ndarray], actors: list[int]) -> np.ndarray:
@@ -213,14 +211,10 @@ def emotion_window(trial: np.ndarray, index: int, track: str) -> np.ndarray:
         trial = trial.T
     if trial.shape[0] != 62:
         raise ValueError(f"expected 62 emotion channels, got {trial.shape}")
-    width = 4000 if track == "seediv" else 800
+    width = 800
     chunk = trial[:, index * width:(index + 1) * width]
     if index < 0 or chunk.shape[1] != width:
         raise ValueError(f"incomplete emotion window {index}: {chunk.shape}")
-    # Legacy SEED-VII reader cast before slicing, whereas SEED-IV used float64.
-    chunk = chunk.astype(np.float64 if track == "seediv" else np.float32)
-    if width != 800:
-        chunk = resample(chunk, 800, axis=1)
     return chunk.T.astype(np.float32)
 
 
@@ -257,7 +251,7 @@ def _write_emotion(root: Path, destination: Path, manifest: dict) -> None:
     for i, row in enumerate(rows):
         groups[row["relative_path"]].append((i, row))
     labels = _seed_vii_labels(root) if track == "seedvii" else None
-    width = 4000 if track == "seediv" else 800
+    width = 800
     for relative, records in groups.items():
         mat = loadmat(root / relative)
         trials = defaultdict(list)
@@ -348,7 +342,7 @@ def prepare(data_root: str | Path, processed_root: str | Path, task: str = "all"
             np.save(processed / "tone" / f"{filename}.npy", np.asarray([r[field] for r in reference["content"]], dtype=np.int64))
         metadata = dict(channels=CONTENT_CHANNELS, emg_channels=emg_names,
             trials=reference["content"], condition="T2", sampling_rate=125, duration_seconds=4,
-            preprocessing="500 Hz intermediate; EEG baseline [-1.5,0] and trial z-score; EMG abs/50-point moving mean and trial z-score; resample to 500; no differences stored")
+            preprocessing="500 Hz intermediate; EEG baseline [-1.5,0] and trial z-score; EMG abs/50-point moving mean and trial z-score; resample to 500; store raw channels")
         _write_completion(processed / "tone/metadata.json", metadata)
     if tracks:
         mels = defaultdict(list)
@@ -369,8 +363,8 @@ def prepare(data_root: str | Path, processed_root: str | Path, task: str = "all"
                 np.save(directory / f"{split}_pairs.npy", make_pairs(manifest, split))
             manifest.update(content_channels=CONTENT_CHANNELS, emotion_channels=EMOTION_CHANNELS,
                 emotion_names=EMOTION_NAMES, source_sample_rate_hz=200,
-                emotion_source_window_samples=4000 if name == "seediv" else 800,
-                emotion_source_window_seconds=20 if name == "seediv" else 4,
+                emotion_source_window_samples=800,
+                emotion_source_window_seconds=4,
                 emotion_output_samples=800, mel_valid_frames=187, audio_index=audio)
             _write_completion(directory / "manifest.json", manifest)
     return dict(tone_trials=4800 if tone else 0, tracks=tracks, processed_root=str(processed))

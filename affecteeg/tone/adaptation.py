@@ -1,6 +1,6 @@
 """Train/validation-only fits with paired initialization and bounded search.
 
-This module receives arrays; it has no raw EEG or outer feature loader.
+This module receives prepared feature arrays.
 """
 from __future__ import annotations
 

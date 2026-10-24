@@ -50,7 +50,7 @@ def templates(backbone):
         elif row['rank'] == 'expanded_rank':
             row['rank'] = 16 if dimension <= 64 else 64 if backbone == 'eeg_deformer' else 32
         row['feature_mode'] = 'native'
-    # Refit the six fixed-grid anchors, rather than relying on historical results.
+    # Fit the six fixed-grid anchors.
     for lr in (1e-4, 1e-3):
         for weight in (1., 10., 100.):
             rows.append(dict(id=f'grid_lr{lr:g}_cov{weight:g}', adapter_lr=lr,

@@ -23,12 +23,12 @@ def test_each_backbone_forward_update_and_checkpoint(backbone, variant, tmp_path
     stats, pool = statistics()
     model = ReconstructionModel(backbone, variant, stats, pool).to(device)
     x, token = torch.randn(2, 800, 59, device=device), torch.randn(2, 128, device=device)
-    target = torch.randn(2, 100, 188, device=device)
+    target = torch.randn(2, 100, 187, device=device)
     scaler = MelStandardizer(torch.zeros(1, 100, 1), torch.ones(1, 100, 1))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     before = next(model.content_encoder.parameters()).detach().clone()
     result = model(x, token if variant == 'affecteeg' else None)
-    assert result.mel.shape == (2, 100, 188)
+    assert result.mel.shape == (2, 100, 187)
     loss = reconstruction_loss(result.mel, target, scaler)
     assert torch.isfinite(loss)
     loss.backward()
@@ -116,19 +116,23 @@ def test_initial_memory_statistics_ignore_heldout_sources():
 
 def test_corrected_loss_is_normalized_per_frequency_element():
     torch.manual_seed(4)
-    p = torch.randn(3, 1, 188)
-    y = torch.randn(3, 1, 188)
-    # Identical frequency copies must not multiply the SmoothL1 term by 100.
+    p = torch.randn(3, 1, 187)
+    y = torch.randn(3, 1, 187)
+    # The SmoothL1 average is invariant to the number of identical frequency copies.
     torch.testing.assert_close(corrected_shape_loss(p.repeat(1, 3, 1), y.repeat(1, 3, 1)),
                                corrected_shape_loss(p.repeat(1, 100, 1), y.repeat(1, 100, 1)))
 
 
-def test_metrics_ignore_padded_frame_and_selector_order():
+def test_metrics_include_final_frame_and_selector_order():
     torch.manual_seed(5)
-    target = torch.randn(3, 100, 188)
+    target = torch.randn(3, 100, 187, dtype=torch.float64)
     prediction = target.clone()
-    prediction[..., -1] += 1e6
     np.testing.assert_allclose(item_metrics(prediction, target), [[1, 0, 0]]*3, atol=1e-12)
+    prediction[..., -1] += 1
+    metrics = item_metrics(prediction, target)
+    assert np.all(metrics[:, 0] < 1)
+    np.testing.assert_allclose(metrics[:, 1], 1 / 187, atol=1e-12)
+    np.testing.assert_allclose(metrics[:, 2], 10 / target.flatten(1).norm(dim=1).numpy(), atol=1e-12)
     selector = Selector()
     assert selector.consider({'pcc': .6, 'l1': 2}, 1)
     assert not selector.consider({'pcc': .6, 'l1': 2}, 2)
@@ -149,7 +153,7 @@ def test_complete_joint_update_changes_encoder_and_adapter():
     class Sampler:
         def sample(self):
             return np.arange(8), np.zeros(8, dtype=int)
-    batch = {'eeg': torch.randn(2, 800, 59), 'emotion': torch.arange(2), 'mel': torch.randn(2, 100, 188)}
+    batch = {'eeg': torch.randn(2, 800, 59), 'emotion': torch.arange(2), 'mel': torch.randn(2, 100, 187)}
     def resolver(rows):
         return torch.ones(len(rows), 128)
     scaler = MelStandardizer(torch.zeros(1, 100, 1), torch.ones(1, 100, 1))

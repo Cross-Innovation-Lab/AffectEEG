@@ -65,7 +65,7 @@ def validate_pairs(manifest: dict, pairs: np.ndarray, split: str) -> None:
 
 
 def _protocol_seed(value: dict) -> str:
-    # These are the published sampler's numerical random seeds, not file checksums.
+    # Fixed numerical random seeds for the pairing sampler.
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -73,7 +73,7 @@ def make_pairs(manifest: dict, split: str, seed: int = 20260729, epoch: int = 0)
     """100 pairs per key; fixed evaluation pairs and source-stable epoch sampling.
 
     Training exhausts each key's emotion donors before repeating one. Content
-    choices and round-robin key interleaving reproduce the original sampler.
+    choices use fixed random seeds with round-robin key interleaving.
     """
     if split not in SPLITS:
         raise ValueError(f"unknown split {split}")
@@ -155,7 +155,7 @@ def load_cevb(root: str | Path, track: str) -> dict:
             ("content_eeg", "emotion_eeg", "targets", "val_pairs", "test_pairs")}
     for name, shape in (("content_eeg", (len(manifest["content"]), 800, 59)),
                         ("emotion_eeg", (len(manifest["emotion"]), 800, 62)),
-                        ("targets", (len(manifest["keys"]), 100, 188))):
+                        ("targets", (len(manifest["keys"]), 100, 187))):
         if data[name].shape != shape:
             raise ValueError(f"{name} shape {data[name].shape} does not match {shape}")
     for split in ("val", "test"):

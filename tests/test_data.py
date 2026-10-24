@@ -4,14 +4,13 @@ import json
 import numpy as np
 import pytest
 from scipy.io import wavfile
-from scipy.signal import resample
 
 from affecteeg.data import load_cevb, load_protocol, load_tone, make_pairs, validate_manifest, validate_pairs
 from affecteeg.preparation import actor_trimmed_mean, canonical_log_mel, emotion_window, event_groups, prepare, vocabulary
 
 
 @pytest.mark.parametrize("track,windows,counts", [
-    ("seediv", 7035, (12700, 3800, 3700)),
+    ("seediv", 37575, (12700, 3800, 3700)),
     ("seedvii", 69742, (21500, 7100, 7100)),
 ])
 def test_full_protocol_counts_labels_and_source_partitions(track, windows, counts):
@@ -55,12 +54,11 @@ def test_duplicate_source_and_cross_partition_pair_rejected():
         validate_manifest(broken)
 
 
-def test_seediv_retains_true_20second_window():
-    raw = np.random.default_rng(0).normal(size=(62, 8000))
+def test_seediv_uses_actual_four_second_window():
+    raw = np.random.default_rng(0).normal(size=(62, 1900))
     actual = emotion_window(raw, 1, "seediv")
-    expected = resample(raw[:, 4000:8000], 800, axis=1).T.astype(np.float32)
+    expected = raw[:, 800:1600].T.astype(np.float32)
     np.testing.assert_array_equal(actual, expected)
-    assert 4000 / 200 == 20
     with pytest.raises(ValueError, match="incomplete"):
         emotion_window(raw, 2, "seediv")
 
@@ -77,14 +75,24 @@ def test_canonical_actor_mean_before_per_bin_trim():
     np.testing.assert_array_equal(actor_trimmed_mean(mels[:3], [1, 1, 2]), [[3., 7.]])
 
 
-def test_canonical_mel_has_exact_padding_and_finite_values(tmp_path):
-    path = tmp_path / "short.wav"
-    wavfile.write(path, 24000, (np.sin(2 * np.pi * 440 * np.arange(6000) / 24000) * 16000).astype(np.int16))
+def test_canonical_mel_matches_two_second_stft(tmp_path):
+    import librosa
+    path = tmp_path / "two_seconds.wav"
+    audio = (np.sin(2 * np.pi * 440 * np.arange(48000) / 24000) * 16000
+             + np.random.default_rng(2).normal(0, 500, 48000)).astype(np.int16)
+    wavfile.write(path, 24000, audio)
     mel = canonical_log_mel(path)
-    assert mel.shape == (100, 188)
+    assert mel.shape == (100, 187)
     assert np.isfinite(mel).all()
-    np.testing.assert_allclose(mel[:, -1], np.log(1e-5), atol=1e-6)
-    assert np.std(mel[:, :187]) > 0
+    waveform = np.pad(audio.astype(np.float32) / 32767, (384, 384), mode="reflect")
+    frames = np.lib.stride_tricks.sliding_window_view(waveform, 1024)[::256]
+    spectrum = np.fft.rfft(frames * np.hanning(1025)[:-1], axis=1).T
+    magnitude = np.sqrt(np.abs(spectrum) ** 2 + 1e-9)
+    filters = librosa.filters.mel(sr=24000, n_fft=1024, n_mels=100,
+                                 fmin=0, fmax=None, htk=False, norm="slaney")
+    expected = np.log(np.maximum(filters @ magnitude, 1e-5))
+    np.testing.assert_allclose(mel, expected, atol=5e-5)
+    assert np.any(mel[:, -1] > np.log(1e-5))
 
 
 def test_stereo_integer_pcm_uses_original_amplitude_scale(tmp_path):

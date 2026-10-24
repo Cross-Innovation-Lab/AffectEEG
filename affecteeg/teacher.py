@@ -10,7 +10,7 @@ from .common import read_json, write_json, resolve_device
 
 
 def _file_version(path):
-    """Cheap cache invalidation for immutable prepared inputs, without rereading EEG."""
+    """Track prepared-input versions using file path, size, and modification time."""
     path = Path(path).resolve()
     stat = path.stat()
     return {"path": str(path), "bytes": stat.st_size, "mtime_ns": stat.st_mtime_ns}

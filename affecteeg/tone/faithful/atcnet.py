@@ -310,7 +310,7 @@ class FaithfulATCNet(ToneBaselineWrapper):
         self.temporal_adjustment = "none"
         self.port_notes = (
             "PyTorch port of official Keras ATCNet_ at "
-            "EEG-ATCNet/models.py; TorchEEG line 173 bug is not copied. "
+            "EEG-ATCNet/models.py. "
             "MHA output feeds dropout and residual; TCN projection is conditional. "
             "Training hooks preserve conv/TCN L2(0.009), classifier L2(0.5), "
             "and kernel max_norm(0.6). MHA initialization uses Keras "

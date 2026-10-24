@@ -1,4 +1,4 @@
-"""Corrected shape loss and per-item original-log-mel evaluation metrics."""
+"""Masked shape loss and per-item original-log-mel evaluation metrics."""
 from __future__ import annotations
 from dataclasses import dataclass
 from collections import defaultdict
@@ -50,13 +50,13 @@ def corrected_shape_loss(prediction, target):
 
 def reconstruction_loss(prediction, raw_target, scaler):
     shape = corrected_shape_loss(prediction, scaler.transform(raw_target))
-    raw = pearson_loss(scaler.inverse(prediction)[..., :187], raw_target[..., :187], epsilon=1e-12)
+    raw = pearson_loss(scaler.inverse(prediction), raw_target, epsilon=1e-12)
     return shape + .5*raw
 
 
 def item_metrics(prediction, target):
     """PCC, mean absolute error, relative Frobenius error on 100 x 187."""
-    p, y = prediction[..., :187].double().flatten(1), target[..., :187].double().flatten(1)
+    p, y = prediction.double().flatten(1), target.double().flatten(1)
     pc, yc = p-p.mean(1, keepdim=True), y-y.mean(1, keepdim=True)
     pcc = (pc*yc).sum(1)/(pc.norm(dim=1)*yc.norm(dim=1)).clamp_min(1e-12)
     return torch.stack((pcc, (p-y).abs().mean(1), (p-y).norm(dim=1)/y.norm(dim=1).clamp_min(1e-12)), 1).detach().cpu().numpy()

@@ -33,7 +33,7 @@ class ReconstructionModel(nn.Module):
             raise ValueError((backbone, variant))
         self.backbone, self.variant = backbone, variant
         self.content_encoder = _build_external_core(backbone, 59, 256, .1)
-        self.decoder = _build_external_decoder(backbone, 256, 100, 188, .1)
+        self.decoder = _build_external_decoder(backbone, 256, 100, 187, .1)
         if backbone == 'ssm2mel':
             self.content_encoder = DeterministicSSM2MelCore(self.content_encoder)
         for module in self.content_encoder.modules():

@@ -1,7 +1,6 @@
 """Frozen MD-JPT inference with local weights and explicit channel alignment.
 
 Adapted from the project encoder and ncclab-sustech/mdJPT_nips2025.
-No pretraining pipeline or online model loading is required.
 """
 from pathlib import Path
 from typing import Sequence
@@ -30,7 +29,7 @@ def _require_file(path, label):
 
 
 class _FrozenBackbone(nn.Module):
-    """Exact checkpoint-bearing inference modules, without Lightning training code."""
+    """Inference modules matching the local checkpoint."""
     def __init__(self, cfg):
         super().__init__()
         self.uni_mlp = Channel_mlp_CNN(len(cfg["uni_channels"]), cfg["cnn"]["n_channs"])
@@ -54,7 +53,7 @@ class FrozenMdJPTEncoder(nn.Module):
     """Strictly loaded, fully frozen, batch-invariant mdJPT feature encoder.
 
     Inputs use ``[batch, time, channels]`` and explicit channel names.  The adapter
-    keeps variable-duration inputs native; it does not silently pad or time-warp.
+    preserves the duration of variable-length inputs.
     Sampling-rate conversion and dataset-specific normalization are caller-owned.
     """
 

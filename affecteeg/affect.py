@@ -41,7 +41,7 @@ def output_directory(output_root, track, seed, smoke=False):
 
 
 def extract_de(windows):
-    """Exact existing MAET 5-band PSD/DE indexing; no filtering or z-scoring."""
+    """Compute MAET five-band PSD/DE directly from the input windows."""
     raw = np.asarray(windows, dtype=np.float64)
     single = raw.ndim == 2
     if single:

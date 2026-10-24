@@ -1,7 +1,7 @@
 """Ten main-experiment backbones, all initialized from scratch.
 
-Only architecture code and electrode coordinates are vendored. Constructors never
-load checkpoints or contact a model hub. Original model interfaces are preserved.
+Vendored architecture code and electrode coordinates support local initialization.
+The adapters preserve the upstream model interfaces.
 """
 from pathlib import Path
 import json
@@ -51,7 +51,7 @@ class STEEGFormer(PatchBackbone):
             drop_rate=.1, drop_path_rate=.1, attn_drop_rate=.1, proj_drop_rate=.1)
         # Scratch training learns these channel embeddings jointly from epoch 1.
         self.register_buffer('channel_indices', torch.arange(20))
-        # Official parameters not used by forward_features have no trainable role.
+        # Freeze parameters outside the forward_features computation.
         self.backbone.pos_embed.requires_grad_(False)
         if hasattr(self.backbone, 'fc_norm'):
             self.backbone.fc_norm.requires_grad_(False)

@@ -23,13 +23,13 @@ python -m pip install -r requirements-test.txt
 python -m affecteeg --help
 ```
 
-Keep the complete extracted directory, including `assets/` and `vendor/`. Run the commands below from that directory. Optional editable installation is supported with `python -m pip install --no-deps -e .`; a relocated wheel without the external asset directories is not the supported distribution format. No command downloads datasets, architectures, or pretrained weights automatically.
+Keep the complete extracted directory, including `assets/` and `vendor/`. Run the commands below from that directory. Optional editable installation is supported with `python -m pip install --no-deps -e .`; the distribution requires the external asset directories. Dataset acquisition is manual; architecture code and the MD-JPT checkpoint are bundled.
 
 ## Dataset index and layout
 
 | Source | Role | Acquisition |
 |---|---|---|
-| Mandarin EEG–EMG, silent articulation (T2) | Tone labels, 59-channel content EEG, five-channel EMG | [Ju et al., dataset paper](https://doi.org/10.1109/TNSRE.2025.3616276). A public download URL has not been verified; contact the dataset authors for access. |
+| Mandarin EEG–EMG, silent articulation (T2) | Tone labels, 59-channel content EEG, five-channel EMG | [Ju et al., dataset paper](https://doi.org/10.1109/TNSRE.2025.3616276). Contact the dataset authors for access. |
 | SEED-IV | Four-class affective EEG | [Official dataset page](https://bcmi.sjtu.edu.cn/home/seed/seed-iv.html) and [access application](https://bcmi.sjtu.edu.cn/home/seed/downloads.html). Acquire the EEG files and channel-order spreadsheet. |
 | SEED-VII | Seven-class affective EEG | [Official dataset page](https://bcmi.sjtu.edu.cn/home/seed/seed-vii.html) and [access application](https://bcmi.sjtu.edu.cn/home/seed/downloads.html). Acquire `EEG_preprocessed` and the channel-order and emotion-label spreadsheets. |
 | MCAE-Monosyllable | Actor-aggregated acoustic targets | [Official OSF project](https://osf.io/h3uem/) and [dataset paper](https://doi.org/10.3758/s13428-025-02607-4). Acquire the audio files and `corpus information.xlsx`. |
@@ -61,7 +61,7 @@ data/raw/
     Audio files/<emotion>/<six-digit-filename>.wav
 ```
 
-`assets/protocol/vocabulary.csv` contains the 120-row `(group, tone) -> syllable` index. Labels are resolved using both group and tone. The two compressed protocol files contain source identities, partitions, condition keys, and fixed evaluation pair indices; they contain no EEG or audio signals. Mandarin event files are checked against this mapping before output arrays are allocated.
+`assets/protocol/vocabulary.csv` contains the 120-row `(group, tone) -> syllable` index. Labels are resolved using both group and tone. The two compressed protocol files contain source identities, partitions, condition keys, and fixed evaluation pair indices. Mandarin event files are checked against this mapping before output arrays are allocated.
 
 ```bash
 # All data needed for both main tasks:
@@ -73,21 +73,21 @@ python -m affecteeg prepare --task cevb --track seediv
 python -m affecteeg prepare --raw-root /path/to/raw --processed-root /path/to/processed
 ```
 
-Use one preparation command for each destination. Completed prepared directories are not overwritten; choose a fresh `--processed-root` to rebuild. Missing files, mismatched labels/channels, incomplete trials, and unexpected source counts raise an error.
+Use one preparation command for each destination. Choose a fresh `--processed-root` to rebuild. Missing files, mismatched labels/channels, incomplete trials, and unexpected source counts raise an error.
 
 ## CEVB construction
 
 CEVB aligns independently recorded content EEG, affective EEG, and canonical acoustic references by `(syllable, tone, emotion)`. Content EEG consists of 4,800 Mandarin T2 trials, each with 59 channels and 800 samples at 200 Hz. The source partitions contain 2,400/1,200/1,200 content trials. Condition keys and exact source instances are disjoint across training, validation, and test; participants and original affective trials may occur in multiple outer partitions.
 
-**SEED-IV uses the explicitly retained historical preprocessing.** Each window consumes 4,000 samples from the actual 200 Hz source recording, covering **20 seconds**, then Fourier-resamples it to 800 samples. This produces 7,035 windows. The downstream model/DE preprocessing retains the historical 200 Hz processing convention after temporal compression. These are not physical four-second windows. This choice preserves the agreed historical sample pool and is an explicit exception to the manuscript's four-second wording. SEED-VII uses genuine non-overlapping four-second, 800-sample windows at 200 Hz, producing 69,742 windows. Incomplete tails are discarded.
+SEED-IV and SEED-VII use non-overlapping four-second windows of 800 samples at 200 Hz, producing 37,575 and 69,742 windows, respectively. Incomplete tails are discarded.
 
-The official MCAE spreadsheet is joined to the 120-row vocabulary, retaining 1,307 recordings. Waveforms become mono, are linearly resampled to 24 kHz, and are truncated or right-zero-padded to two seconds. Mel extraction uses FFT/window 1,024, hop 256, a periodic Hann window, 384-sample reflection padding, `center=False`, and 100 Slaney mel filters. Magnitudes use epsilon `1e-9`, and the natural logarithm has a `1e-5` floor. The 187 valid frames are padded to 188 with `log(1e-5)`.
+The official MCAE spreadsheet is joined to the 120-row vocabulary, retaining 1,307 recordings. Waveforms become mono, are linearly resampled to 24 kHz, and are truncated or right-zero-padded to two seconds. Mel extraction uses FFT/window 1,024, hop 256, a periodic Hann window, 384-sample reflection padding, `center=False`, and 100 Slaney mel filters. Magnitudes use epsilon `1e-9`, and the natural logarithm has a `1e-5` floor. Mel extraction produces a `100×187` spectrogram.
 
 Repeated recordings are averaged within each actor. At each time–frequency location, the highest and lowest actor means are removed when at least three actors contribute; the remaining actor means are averaged. With one or two actors, all actor means are averaged. Every item with the same condition key shares this canonical target.
 
 | Track | Affective windows | Train/validation/test keys | Train/validation/test pairs |
 |---|---:|---:|---:|
-| SEED-IV | 7,035 historical compressed windows | 127 / 38 / 37 | 12,700 / 3,800 / 3,700 |
+| SEED-IV | 37,575 four-second windows | 127 / 38 / 37 | 12,700 / 3,800 / 3,700 |
 | SEED-VII | 69,742 four-second windows | 215 / 71 / 71 | 21,500 / 7,100 / 7,100 |
 
 Only keys with acoustic references are included: 202 for SEED-IV and 357 for SEED-VII. Each key contributes 100 pairs. Training pairs are deterministically regenerated for each training seed and epoch, exhausting emotion donors before reuse. Validation and test pairs are fixed and shared across all backbones and seeds. Training-only keys determine per-mel-bin target normalization.
@@ -116,7 +116,7 @@ CAT-Net receives `T7 T8 Fp1 Fpz Fp2` and five EMG channels. Each modality concat
 | EEGMamba | 16 | `1e-4 / 1e-3` | AMP on CUDA |
 | REVE | 8 | `2e-5 / 1e-3` | AMP on CUDA |
 
-Native training uses AdamW, weight decay `1e-4`, at most 50 epochs, and early stopping after ten non-improving epochs. CAT-Net compares three independently initialized 15-epoch learning-rate pilots, then trains a new model at the selected rate; its plateau scheduler has factor 0.5, patience five, and minimum rate `1e-5`. Other models select validation BA, then macro-F1. Native regularization and applicable domain loss (weight 0.05) are retained. The four foundation-model rows above are retained project implementation defaults for details not specified in the manuscript; they have no pretrained loading or head-only warmup.
+Native training uses AdamW, weight decay `1e-4`, at most 50 epochs, and early stopping after ten non-improving epochs. CAT-Net compares three independently initialized 15-epoch learning-rate pilots, then trains a new model at the selected rate; its plateau scheduler has factor 0.5, patience five, and minimum rate `1e-5`. Other models select validation BA, then macro-F1. Native regularization and applicable domain loss (weight 0.05) are retained. The four foundation-model rows above use the project implementation defaults, with random initialization and all parameters trained from the first epoch.
 
 AffectEEG freezes the content backbone and original downstream layers. It extracts MD-JPT embeddings, centers them within training-fold tone classes, and fits normalization/PCA using training trials only. A reference classifier is fitted on frozen features at learning rate `1e-3`. Reference and adaptation fits use FP32, AdamW, batch 128, weight decay `1e-4`, and 30 epochs (900 updates on a full training fold).
 
@@ -134,7 +134,7 @@ python -m affecteeg train-tone --backbone eegnet --seed 42 --fold 1 --variant bo
 
 ## Reconstruction and affect-encoder training
 
-The seven reconstruction backbones are NeuroTalk (`neurotalk`), ConvConcatNet (`convconcatnet`), FESDE (`fesde`), SSM2Mel (`ssm2mel`), DMF2Mel (`dmf2mel`), NeuroSonic (`neurosonic`), and CAT-WaveNet (`cat_wavenet`). These are the task-adapted implementations used by the project with a common `800×256` content memory and `100×188` mel output. The names identify their architectural sources; they do not imply exact official speech-system reproductions or pretrained speech weights.
+The seven reconstruction backbones are NeuroTalk (`neurotalk`), ConvConcatNet (`convconcatnet`), FESDE (`fesde`), SSM2Mel (`ssm2mel`), DMF2Mel (`dmf2mel`), NeuroSonic (`neurosonic`), and CAT-WaveNet (`cat_wavenet`). These are the task-adapted implementations used by the project with a common `800×256` content memory and `100×187` mel output. The names identify the architectural sources of these task-specific content encoders and mel decoders, which are trained from random initialization.
 
 For each track and seed, MAET-DE is trained separately on the outer-training affective EEG pool. Its 80/20 inner split groups windows by participant/session/original trial. Five-band DE features have width 310; the MAET EEG embedding has width 32 and a learned projection has width 128. Training uses plain cross-entropy, inverse-class-frequency replacement sampling, Adam `5e-4`, batch 256, 30 epochs, and gradient clipping at one. The selected checkpoint maximizes inner-validation macro-F1, then BA, retaining the earlier tied epoch. DE statistics and participant-balanced class prototypes use only inner-training data. The encoder, classifier, and prototypes remain frozen during reconstruction.
 
@@ -142,7 +142,7 @@ Base and +AffectEEG are trained independently for **50 epochs** on each track wi
 
 Full AffectEEG combines bounded ARRA (rank 16, bound 0.1, zero-initialized output) and rank-four FiLM. The content encoder, ARRA, FiLM, and mel decoder receive reconstruction gradients. Covariance and preservation gradients update only ARRA. Covariance uses training-only MD-JPT targets, within-content/tone centering, PCA32 without whitening, and auxiliary batches of four groups with eight distinct sources each. Eight training batches calibrate the covariance coefficient to a gradient-norm ratio of 0.03, clipped to `[1e-4, 300]`; the coefficient ramps over five epochs. Conflicting covariance gradients are projected against the adapter's reconstruction gradient. Feature-preservation weight is 0.01.
 
-The shared reconstruction objective uses masked Smooth-L1 with beta 0.5, spectral convergence (0.5), temporal differences (0.2), frequency differences (0.1), masked PCC (0.5), standard-deviation matching (0.05), and original-log-mel PCC over 187 valid frames (0.5). **Smooth-L1 divides by retained time–frequency elements**, following the corrected full-model implementation; it does not use the historical frame-only denominator. There is no additional raw-log-mel L1 term.
+The shared reconstruction objective uses masked Smooth-L1 with beta 0.5, spectral convergence (0.5), temporal differences (0.2), frequency differences (0.1), masked PCC (0.5), standard-deviation matching (0.05), and original-log-mel PCC over 187 frames (0.5). **Smooth-L1 divides by retained time–frequency elements**.
 
 ```bash
 python -m affecteeg train-affect --task reconstruction --device cuda:0
@@ -152,11 +152,11 @@ python -m affecteeg evaluate --task reconstruction --device cuda:0
 python -m affecteeg train-reconstruction --track seediv --backbone cat_wavenet --seed 42 --variant both --device cuda:0
 ```
 
-Train the corresponding affect models before full reconstruction; Base alone does not require them. `train-affect` also extracts frozen content-teacher features. This trains ten MAET-DE models (two tracks × five seeds), not MD-JPT pretraining. MD-JPT's upstream checkpoint and inference configuration are already bundled.
+Train the corresponding affect models before full reconstruction; Base can be trained directly. `train-affect` also extracts frozen content-teacher features and trains ten MAET-DE models (two tracks × five seeds). MD-JPT's upstream checkpoint and inference configuration are bundled.
 
 ## Outputs, metrics, and complete runs
 
-Training seeds follow the manuscript by task: CAT-Net and all other tone backbones use `42, 123, 456`; reconstruction and its MAET-DE affect encoders use `42, 123, 456, 789, 1024`. These lists are defined separately in `affecteeg/common.py`. `--seed all` uses the seed list for the selected task, and unsupported seeds are rejected. These commands accept `--processed-root`, `--output-root`, and `--device`; individual coordinates can be selected with `--seed`, `--backbone`, `--fold` (tone), or `--track` (reconstruction). `--smoke` performs shortened diagnostics in a separate `outputs/smoke/` tree. These diagnostics are not paper training runs.
+Training seeds follow the manuscript by task: CAT-Net and all other tone backbones use `42, 123, 456`; reconstruction and its MAET-DE affect encoders use `42, 123, 456, 789, 1024`. These lists are defined separately in `affecteeg/common.py`. `--seed all` uses the seed list for the selected task, and unsupported seeds are rejected. These commands accept `--processed-root`, `--output-root`, and `--device`; individual coordinates can be selected with `--seed`, `--backbone`, `--fold` (tone), or `--track` (reconstruction). `--smoke` performs shortened diagnostics in a separate `outputs/smoke/` tree.
 
 ```text
 outputs/
@@ -173,7 +173,7 @@ outputs/
 
 Tone metrics are BA and macro-F1. Paired effects average seeds within participant, then weight the ten participants equally. Per-backbone 95% intervals use 50,000 participant bootstrap draws (seed 17003), without multiplicity correction. Nine-EEG and ten-backbone averages are descriptive.
 
-Reconstruction metrics reverse target standardization and use only the valid `100×187` region: flattened PCC, mean absolute log-mel error, and relative Frobenius error. Aggregation averages items within key, five seeds, keys within emotion, then emotions equally; backbone means weight all seven models equally. Paired PCC inference uses 10,000 emotion-stratified key bootstrap draws shared across models (track seeds 20261010/20261011), centered two-sided bootstrap p-values, and one Holm family of 16 comparisons. The complete family is produced only after all 140 evaluations exist. Incomplete outputs are labelled partial.
+Reconstruction metrics reverse target standardization and use the full `100×187` spectrogram: flattened PCC, mean absolute log-mel error, and relative Frobenius error. Aggregation averages items within key, five seeds, keys within emotion, then emotions equally; backbone means weight all seven models equally. Paired PCC inference uses 10,000 emotion-stratified key bootstrap draws shared across models (track seeds 20261010/20261011), centered two-sided bootstrap p-values, and one Holm family of 16 comparisons. The complete family is produced only after all 140 evaluations exist. Incomplete outputs are labelled partial.
 
 After preparing data, the full sequential training/evaluation matrix can be launched with:
 
@@ -181,7 +181,7 @@ After preparing data, the full sequential training/evaluation matrix can be laun
 AFFECTEEG_DEVICE=cuda:0 bash scripts/run_main.sh
 ```
 
-For validation without full experiment training:
+For package validation:
 
 ```bash
 python -m pytest -q
@@ -192,8 +192,8 @@ python scripts/package_release.py
 
 See [VALIDATION.md](VALIDATION.md) for the checks performed on this release.
 
-## Protocol provenance
+## Current configuration
 
-The package follows the current main manuscript for backbone scope, scratch tone initialization, `42/123/456` tone seeds, 500-sample EEG-only inputs, and 50-epoch Base/full reconstruction. Reconstruction and MAET-DE use the manuscript's five seeds `42/123/456/789/1024`. Supplementary settings supply details not expanded in the main text. Four foundation-model optimizer defaults and the corrected reconstruction loss come from the existing project implementation. The historical SEED-IV compression is retained by explicit project decision and described above with its actual duration.
+The package follows the current main manuscript for backbone scope, scratch tone initialization, `42/123/456` tone seeds, 500-sample EEG-only inputs, and 50-epoch Base/full reconstruction. Reconstruction and MAET-DE use the manuscript's five seeds `42/123/456/789/1024`. Supplementary settings provide detailed hyperparameters. Four foundation-model optimizer defaults and the reconstruction loss come from the project implementation.
 
 Third-party architecture and checkpoint sources, together with included license files, are listed in [THIRD_PARTY.md](THIRD_PARTY.md).

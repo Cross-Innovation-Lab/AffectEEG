@@ -17,13 +17,13 @@ def deterministic_adaptive_pool(sequence, bins):
                         for index in range(bins)], dim=-1)
 
 def deterministic_double_linear(sequence):
-    """Exactly doubled align_corners=False linear interpolation, without atomics."""
+    """Deterministic twofold linear interpolation matching align_corners=False."""
     left = torch.cat((sequence[..., :1], sequence[..., :-1]), dim=-1)
     right = torch.cat((sequence[..., 1:], sequence[..., -1:]), dim=-1)
     return torch.stack((.75 * sequence + .25 * left, .75 * sequence + .25 * right), dim=-1).flatten(-2)
 
 class DeterministicSSM2MelCore(nn.Module):
-    """Keep all original SSM2Mel parameters and change only its doubling kernel."""
+    """Reuse SSM2Mel parameters with deterministic twofold interpolation."""
     def __init__(self, original):
         super().__init__()
         for name in ("stem", "down", "forward_state", "backward_state", "skip_mix"):
@@ -44,7 +44,7 @@ class DeterministicSSM2MelCore(nn.Module):
 
 @contextmanager
 def _auxiliary_evaluation(module, *, gradients):
-    """Keep eval semantics and isolate auxiliary RNG without disabling cuDNN.
+    """Keep evaluation semantics with isolated auxiliary RNG and cuDNN support.
 
     A cuDNN RNN needs its training reserve for backward, even when its dropout
     is zero. Only RNNBase instances enter training mode in the gradient path;
@@ -60,7 +60,7 @@ def _auxiliary_evaluation(module, *, gradients):
         for child, _ in recurrent:
             child.dropout = 0.0
             child.training = bool(gradients)
-        # Native eval RNNs used IEEE FP32. Keep that precision in the faster
+        # Native eval RNNs use IEEE FP32. Keep that precision in the faster
         # auxiliary cuDNN path; TF32 convolution otherwise changes memory by
         # about 3e-4 on the registered NeuroTalk inputs.
         backend = torch.backends.cudnn.flags(
@@ -114,8 +114,7 @@ def grouped_covariance(content, teacher, group_ids, *, group_size=None):
     """Average squared within-group cross-covariance.
 
     ``group_size`` uses batched matmul for the sampler's contiguous 4x8 layout.
-    Its labels must remain on the CPU, so layout validation does not synchronize
-    the GPU. The generic path retains support for unordered, unequal groups.
+    Its labels remain on the CPU for local layout validation. The generic path retains support for unordered, unequal groups.
     """
     if content.ndim != 2 or teacher.ndim != 2 or len(content) != len(teacher):
         raise ValueError("covariance inputs must be aligned two-dimensional matrices")
@@ -180,7 +179,7 @@ class StrongBoundedAdapter(CommonPoolView, BoundedContentAdapter):
         pass
 
 def covariance_correction(task, covariance):
-    """Return gCprime-gC and inspectable scalar geometry; do not mutate inputs.
+    """Return gCprime-gC and inspectable scalar geometry, preserving the inputs.
 
     Reductions use float64 to avoid a spurious zero norm from FP32 squaring.
     The correction itself retains each parameter's FP32 dtype.

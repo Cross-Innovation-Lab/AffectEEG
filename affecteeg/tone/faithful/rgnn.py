@@ -1,4 +1,4 @@
-"""Dependency-free mathematical port of the official RGNN SGConv model."""
+"""Dense PyTorch port of the official RGNN SGConv model."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ STANDARD_BILATERAL_PAIRS = (
 
 @lru_cache(maxsize=1)
 def _standard_coordinates() -> dict[str, list[float]]:
-    """Read the checked-in 10-05 coordinates without importing LibEER trainers."""
+    """Read the checked-in 10-05 coordinates."""
     spec = importlib.util.spec_from_file_location(
         "_rgnn_standard_coordinates", STANDARD_COORDINATE_SOURCE
     )
@@ -68,7 +68,7 @@ def standard_coordinate_adjacency(channel_names: tuple[str, ...]) -> torch.Tenso
 
     Its millimetre coordinates are divided by 10, then off-diagonal weights
     are min(5 / squared_distance_cm, 1). Present bilateral pairs lose one in
-    both directions. No EEG examples or class labels are used to build the graph.
+    both directions. Electrode names and coordinates determine the graph.
     """
     names = tuple(name.upper() for name in channel_names)
     if not names or len(set(names)) != len(names):
@@ -125,8 +125,8 @@ class FaithfulRGNN(ToneBaselineWrapper):
     """Official signed SGConv, graph sum pooling, dropout, and L1 graph loss."""
 
     port_notes = (
-        "torch_geometric-free dense SGConv; the historical Tone5 graph is retained, "
-        "and larger montages use the existing 10-05 coordinate RGNN initialization."
+        "Dense PyTorch SGConv with the five-channel Tone5 graph; "
+        "larger montages use 10-05 coordinate RGNN initialization."
     )
     graph_metadata = FIVE_CHANNEL_GRAPH_METADATA
 
